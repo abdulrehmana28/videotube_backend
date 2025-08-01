@@ -1,33 +1,39 @@
-
-
+import { ErrorResponse } from "../utils/ErrorResponse.js"
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { User } from "../models/user.models.js";
 import { deleteFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
+import { deleteLocalFiles } from "../utils/deleteLocalFiles.js";
 
 const registerUser = asyncHandler(async (req, res) => {
     const { fullname, email, username, password } = req.body;
 
-    // add basic validation
     if (!fullname || !email || !username || !password) {
-        return res.status(400).json(new ApiResponse(400, "All fields are required"));
+        deleteLocalFiles([req.files?.avatar?.[0]?.path, req.files?.coverImage?.[0]?.path]);
+        throw new ErrorResponse(400, "All fields are required");
     }
+
+
+    const avatarLocalPath = req.files?.avatar?.[0]?.path;
+    const coverImageLocalPath = req.files?.coverImage?.[0]?.path;
+
+
     // check if user already exists
     const userExists = await User.findOne({
         $or: [{ username }, { email }]
     });
     if (userExists) {
-        return res.status(409).json(new ApiResponse(409, "user already exist"));
+        deleteLocalFiles([avatarLocalPath, coverImageLocalPath]);
+        throw new ErrorResponse(409, "User already exists");
     }
 
-    // TODO
+
     console.log("Files received:", req.files);
 
-    const avatarLocalPath = req.files?.avatar?.[0]?.path;
-    const coverImageLocalPath = req.files?.coverImage?.[0]?.path;
+
 
     if (!avatarLocalPath) {
-        return res.status(400).json(new ApiResponse(400, "Avatar is required"));
+        throw new ErrorResponse(400, "Avatar is required");
     }
 
     // const avatar = await uploadOnCloudinary(avatarLocalPath);
@@ -41,7 +47,8 @@ const registerUser = asyncHandler(async (req, res) => {
         avatar = await uploadOnCloudinary(avatarLocalPath);
     } catch (error) {
         console.log("Error uploading avatar: ", error);
-        return res.status(500).json(new ApiResponse(500, "Error uploading avatar"));
+        deleteLocalFiles([avatarLocalPath]);
+        throw new ErrorResponse(500, "Error uploading avatar");
     }
 
     let coverImage;
@@ -49,12 +56,13 @@ const registerUser = asyncHandler(async (req, res) => {
         if (coverImageLocalPath) {
             coverImage = await uploadOnCloudinary(coverImageLocalPath);
         }
-        // TODO
+
         console.log("Avatar path:", avatarLocalPath);
         console.log("Cover image path:", coverImageLocalPath);
     } catch (error) {
         console.log("Error uploading coverImage: ", error);
-        return res.status(500).json(new ApiResponse(500, "Error uploading coverImage"));
+        deleteLocalFiles([coverImageLocalPath]);
+        throw new ErrorResponse(500, "Error uploading coverImage");
     }
 
     // creating user
@@ -70,10 +78,10 @@ const registerUser = asyncHandler(async (req, res) => {
 
         const createdUser = await User.findById(user._id).select("-password -refreshToken");
         if (!createdUser) {
-            return res.status(500).json(new ApiResponse(500, "Something went wrong while registering the user"));
+            throw new ErrorResponse(500, "Something went wrong while registering the user");
         }
 
-        return res.status(201).json(new ApiResponse(200, createdUser, "User registered Successfully"));
+        return res.status(201).json(new ApiResponse(201, createdUser, "User registered Successfully"));
 
     } catch (error) {
 
@@ -87,7 +95,7 @@ const registerUser = asyncHandler(async (req, res) => {
 
         console.log("Error registering user: ", error);
 
-        return res.status(500).json(new ApiResponse(500, "Something went wrong while registering the user"));
+        throw new ErrorResponse(500, "Something went wrong while registering the user");
     }
 });
 
