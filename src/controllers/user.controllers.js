@@ -2,7 +2,7 @@ import { ErrorResponse } from "../utils/ErrorResponse.js"
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { User } from "../models/user.models.js";
-import { deleteFromCloudinary, uploadOnCloudinary } from "../utils/cloudinary.js";
+import { deleteFromCloudinary, uploadOnCloudinary, getPublicIdFromUrl } from "../utils/cloudinary.js";
 import { deleteLocalFiles } from "../utils/deleteLocalFiles.js";
 import jwt from "jsonwebtoken";
 
@@ -25,6 +25,8 @@ const generateAccessAndRefreshTokens = async (userId) => {
     }
 };
 
+// @desc    Register a new user
+// @route   POST /api/users/register
 const registerUser = asyncHandler(async (req, res) => {
     const { fullname, email, username, password } = req.body;
 
@@ -119,7 +121,8 @@ const registerUser = asyncHandler(async (req, res) => {
     }
 });
 
-
+// @desc    Login user
+// @route   POST /api/users/login
 const loginUser = asyncHandler(async (req, res) => {
     const { email, username, password } = req.body;
 
@@ -169,6 +172,8 @@ const loginUser = asyncHandler(async (req, res) => {
         )
 })
 
+// @desc    Logout user
+// @route   POST /api/users/logout
 const logoutUser = asyncHandler(async (req, res) => {
     await User.findByIdAndUpdate(
         req.user._id,
@@ -194,7 +199,8 @@ const logoutUser = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, {}, "User logged Out"))
 });
 
-
+// @desc    Refresh access token
+// @route   POST /api/users/refresh-token
 const refreshAccessToken = asyncHandler(async (req, res) => {
     const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken;
 
@@ -243,4 +249,188 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
     }
 });
 
-export { registerUser, loginUser, logoutUser, refreshAccessToken }
+// @desc    Change current password
+// @route   POST /api/users/change-password
+const changeCurrentPassword = asyncHandler(async (req, res) => {
+
+    const { oldPassword, newPassword } = req.body;
+
+    const user = await User.findById(req.user?._id).select("+password");
+
+    if (!user) {
+        throw new ErrorResponse(404, "User not found");
+    }
+
+    const isPasswordCorrect = await user.isPasswordCorrect(oldPassword);
+
+    if (!isPasswordCorrect) {
+        throw new ErrorResponse(401, "Invalid old password");
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, {}, "Password changed successfully"));
+});
+
+// @desc    Get current user
+// @route   GET /api/users/profile
+const getCurrentUser = asyncHandler(async (req, res) => {
+    return res
+        .status(200)
+        .json(new ApiResponse(
+            200,
+            req.user,
+            "User fetched successfully"
+        ));
+});
+
+// @desc    Update account details
+// @route   PATCH /api/users/update-account
+const updateAccountDetails = asyncHandler(async (req, res) => {
+    const { fullname, email } = req.body;
+
+    // Validation
+    if (!fullname && !email) {
+        throw new ErrorResponse(400, "Fullname or email is required");
+    }
+
+    if (email) {
+        const existingUser = await User.findOne({
+            email,
+            _id: { $ne: req.user?._id }
+        });
+
+        if (existingUser) {
+            throw new ErrorResponse(409, "Email already exists");
+        }
+
+    }
+
+    const updatedUser = await User.findByIdAndUpdate(
+        req.user?._id,
+        {
+            $set: {
+                ...(fullname && { fullname }),
+                ...(email && { email })
+            }
+        },
+        {
+            new: true,
+            select: "-password -refreshToken"
+        }
+    );
+
+    if (!updatedUser) {
+        throw new ErrorResponse(404, "User not found");
+    }
+
+    res.status(200).json(new ApiResponse(
+        200,
+        updatedUser,
+        "Account details updated successfully"
+    ));
+});
+
+// @desc    Update user avatar
+// @route   PATCH /api/users/avatar
+const updateUserAvatar = asyncHandler(async (req, res) => {
+    try {
+
+        const avatarLocalPath = req.file?.path;
+
+        if (!avatarLocalPath) {
+            throw new ErrorResponse(400, "Avatar is required");
+        }
+
+        const currentUser = await User.findById(req.user?._id).select("avatar");
+        const oldAvatarUrl = currentUser?.avatar;
+
+        const avatar = await uploadOnCloudinary(avatarLocalPath);
+
+        if (!avatar.url) {
+            deleteLocalFiles([avatarLocalPath]);
+            throw new ErrorResponse(500, error.message || "Failed to upload avatar");
+        }
+
+        if (oldAvatarUrl) {
+            const publicId = getPublicIdFromUrl(oldAvatarUrl);
+            if (publicId) {
+                await deleteFromCloudinary(publicId);
+            }
+        }
+
+        const user = await User.findByIdAndUpdate(
+            req.user?._id,
+            {
+                $set: {
+                    avatar: avatar.url
+                }
+            },
+            { new: true }
+        ).select("-password -refreshToken");
+
+        res
+            .status(200)
+            .json(new ApiResponse(200, user, "Avatar updated successfully"));
+
+    } catch (error) {
+        const avatarLocalPath = req.file?.path;
+        deleteLocalFiles([avatarLocalPath]);
+        throw new ErrorResponse(500, error.message || "Failed to upload avatar");
+    }
+});
+
+// @desc    Update user cover image
+// @route   PATCH /api/users/cover-image
+const updateUserCoverImage = asyncHandler(async (req, res) => {
+
+    try {
+        const coverImageLocalPath = req.file?.path;
+
+        if (!coverImageLocalPath) {
+            throw new ErrorResponse(400, "Cover Image is required");
+        }
+
+        const coverImage = await uploadOnCloudinary(coverImageLocalPath);
+
+        if (!coverImage.url) {
+            deleteLocalFiles([coverImageLocalPath]);
+            throw new ErrorResponse(500, error.message || "Failed to upload Cover Image");
+        }
+
+        const user = await User.findByIdAndUpdate(
+            req.user?._id,
+            {
+                $set: {
+                    coverImage: coverImage.url
+                }
+            },
+            { new: true }
+        ).select("-password -refreshToken");
+
+        res
+            .status(200)
+            .json(new ApiResponse(200, user, "Cover Image updated successfully"));
+
+    } catch (error) {
+        const coverImageLocalPath = req.file?.path;
+        deleteLocalFiles([coverImageLocalPath]);
+        throw new ErrorResponse(500, error.message || "Failed to upload Cover Image");
+    }
+});
+
+
+export {
+    registerUser,
+    loginUser,
+    logoutUser,
+    refreshAccessToken,
+    changeCurrentPassword,
+    getCurrentUser,
+    updateAccountDetails,
+    updateUserAvatar,
+    updateUserCoverImage
+}

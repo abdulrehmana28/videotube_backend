@@ -46,4 +46,39 @@ const deleteFromCloudinary = async (publicId) => {
     }
 }
 
-export { uploadOnCloudinary, deleteFromCloudinary }
+// Helper function to extract public ID from URL
+const getPublicIdFromUrl = (url) => {
+    if (!url) return null;
+
+    try {
+        // Handle different Cloudinary URL formats
+
+        // http://res.cloudinary.com/dfkegimdg/image/upload/v1754205883/by3n0tsid0t1vbx4gyld.png
+        
+        const urlParts = url.split('/');
+        // Parts URL:  [
+        //     'http:',
+        //     '',
+        //     'res.cloudinary.com',
+        //     'dfkegimdg',
+        //     'image',
+        //     'upload',
+        //     'v1754207148',
+        //     'obtkpowb3jwluliizeko.png'
+        //   ]
+
+        const fileName = urlParts[urlParts.length - 1];
+        // File name:  obtkpowb3jwluliizeko.png
+
+        const publicId = fileName.split('.')[0];
+        // Public ID:  obtkpowb3jwluliizeko
+
+
+        return publicId;
+    } catch (error) {
+        console.log("Error extracting public ID:", error);
+        return null;
+    }
+};
+
+export { uploadOnCloudinary, deleteFromCloudinary, getPublicIdFromUrl };
