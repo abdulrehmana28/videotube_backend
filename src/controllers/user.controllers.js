@@ -202,7 +202,7 @@ const logoutUser = asyncHandler(async (req, res) => {
 // @desc    Refresh access token
 // @route   POST /api/users/refresh-token
 const refreshAccessToken = asyncHandler(async (req, res) => {
-    const incomingRefreshToken = req.cookies.refreshToken || req.body.refreshToken;
+    const incomingRefreshToken = req.cookies?.refreshToken || req.body?.refreshToken;
 
     if (!incomingRefreshToken) {
         throw new ErrorResponse(401, "unauthorized request or invalid refresh token");
@@ -215,7 +215,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
             process.env.REFRESH_TOKEN_SECRET,
         );
 
-        const user = await User.findById(decodedToken?._id);
+        const user = await User.findById(decodedToken?._id).select("+refreshToken");
 
         if (!user) {
             throw new ErrorResponse(401, "Invalid refresh token");
@@ -239,13 +239,16 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
             .json(
                 new ApiResponse(
                     200,
-                    { accessToken, refreshToken: newRefreshToken },
+                    {
+                        accessToken,
+                        refreshToken: newRefreshToken
+                    },
                     "Access token refreshed"
                 )
             );
     } catch (error) {
 
-        throw new ErrorResponse(500, error?.message || "Some thing went wrong while generating accessToken");
+        throw new ErrorResponse(401, error?.message || "Some thing went wrong while generating accessToken");
     }
 });
 
