@@ -7,7 +7,9 @@ import {
     getCurrentUser,
     updateUserAvatar,
     updateUserCoverImage,
-    refreshAccessToken
+    refreshAccessToken,
+    getUserChannelProfile,
+    getWatchHistory
 } from "../controllers/user.controllers.js";
 import { upload } from "../middlewares/multer.middlewares.js";
 import { Router } from "express";
@@ -47,5 +49,9 @@ router.get("/profile", verifyJWT, getCurrentUser);
 router.patch("/avatar", verifyJWT, upload.single("avatar"), updateUserAvatar);
 
 router.patch("/cover-image", verifyJWT, upload.single("coverImage"), updateUserCoverImage);
+
+router.get("/@:username", verifyJWT, getUserChannelProfile);
+
+router.get("/history", verifyJWT, getWatchHistory);
 
 export default router;
