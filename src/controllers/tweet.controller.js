@@ -105,12 +105,93 @@ const getUserTweets = asyncHandler(async (req, res) => {
 });
 
 const updateTweet = asyncHandler(async (req, res) => {
-    //TODO: update tweet
-})
+    try {
+
+        const { tweetId } = req.params;
+        const { content } = req.body;
+        const userId = req.user._id;
+
+        if (!content || content?.trim().length === 0) {
+            throw new ErrorResponse(400, "Tweet content cannot be empty");
+        }
+
+        if (content.trim().length > 280) {
+            throw new ErrorResponse(400, "Tweet cannot exceed 280 characters");
+        }
+
+        const updateTweet = await Tweet.findOneAndUpdate(
+            {
+                _id: tweetId,
+                owner: userId
+            },
+            {
+                $set: {
+                    content: content.trim()
+                }
+            },
+            {
+                new: true,
+            });
+
+        if (!updateTweet) {
+            throw new ErrorResponse(404, "Tweet not found or you don't have permission to update it");
+        }
+
+        return res
+            .status(200)
+            .json(new ApiResponse(200, updateTweet, "Tweet updated successfully"));
+
+    } catch (error) {
+        console.error("Update Tweet Error:", error);
+        if (error.name === 'CastError') {
+            throw new ErrorResponse(400, "Invalid tweet ID format");
+        }
+        throw new ErrorResponse(500, "Something went wrong while updating tweet");
+    }
+});
+
 
 const deleteTweet = asyncHandler(async (req, res) => {
     //TODO: delete tweet
-})
+    try {
+
+        const { tweetId } = req.params;
+        const userId = req.user._id;
+
+        if (!tweetId) {
+            throw new ErrorResponse(400, "Tweet ID is missing");
+        }
+
+        const deletedTweet = await Tweet.findOneAndDelete(
+            {
+                _id: tweetId,
+                owner: userId
+            }
+        );
+
+        if (!deletedTweet) {
+            throw new ErrorResponse(404, "Tweet not found or you don't have permission to delete it");
+        }
+
+        if (!deletedTweet) {
+            throw new ErrorResponse(404, "Tweet not found or you don't have permission to delete it");
+        }
+
+        // Success response
+        return res.status(200).json(new ApiResponse(
+            200,
+            {},
+            "Tweet deleted successfully"
+        ));
+
+    } catch (error) {
+        console.error("Delete Tweet Error:", error);
+        if (error.name === 'CastError') {
+            throw new ErrorResponse(400, "Invalid tweet ID format");
+        }
+        throw new ErrorResponse(500, "Something went wrong while deleting tweet");
+    }
+});
 
 export {
     createTweet,
