@@ -30,11 +30,14 @@ const uploadOnCloudinary = async (localFilePath) => {
     }
 }
 
-const deleteFromCloudinary = async (publicId) => {
+const deleteFromCloudinary = async (publicId, resourceType) => {
     try {
         if (!publicId) return null;
 
-        const response = await cloudinary.uploader.destroy(publicId);
+        // const response = await cloudinary.uploader.destroy(publicId);
+        const response = await cloudinary.uploader.destroy(publicId, {
+            resource_type: resourceType // 'image', 'video', or 'auto'
+        });
         console.log("File deleted from cloudinary", response);
 
         return response;
@@ -54,7 +57,7 @@ const getPublicIdFromUrl = (url) => {
         // Handle different Cloudinary URL formats
 
         // http://res.cloudinary.com/dfkegimdg/image/upload/v1754205883/by3n0tsid0t1vbx4gyld.png
-        
+
         const urlParts = url.split('/');
         // Parts URL:  [
         //     'http:',
