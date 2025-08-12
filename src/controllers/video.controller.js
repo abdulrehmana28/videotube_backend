@@ -25,22 +25,22 @@ const publishAVideo = asyncHandler(async (req, res) => {
         throw new ErrorResponse(400, "Title and description required");
     }
 
-    console.log("Video Title:", title);  //!debug
-    console.log("Video description:", description);  //!debug
+    // console.log("Video Title:", title);  //!debug
+    // console.log("Video description:", description);  //!debug
 
     // req.files?.avatar?.[0]?.path;                            
     const videoLocalPath = req.files?.video?.[0]?.path;
     const thumbnailLocalPath = req.files?.thumbnail?.[0]?.path;
 
-    console.log("Video path:", videoLocalPath);  //!debug
-    console.log("thumbnail path:", thumbnailLocalPath);  //!debug
+    // console.log("Video path:", videoLocalPath);  //!debug
+    // console.log("thumbnail path:", thumbnailLocalPath);  //!debug
 
     if (!videoLocalPath || !thumbnailLocalPath) {
         deleteLocalFiles([videoLocalPath, thumbnailLocalPath]);
         throw new ErrorResponse(400, "Video and thumbnail required");
     }
 
-    console.log("Files received:", req.files); //!debug
+    // console.log("Files received:", req.files); //!debug
 
     try {
         // uploading video
@@ -75,8 +75,8 @@ const publishAVideo = asyncHandler(async (req, res) => {
         });
 
         if (!video) {
-            await deleteFromCloudinary(thumbnail?.public_id);
-            await deleteFromCloudinary(videoFile?.public_id);
+            await deleteFromCloudinary(getPublicIdFromUrl(thumbnail.url), "image");
+            await deleteFromCloudinary(getPublicIdFromUrl(videoFile.url), "video");
             throw new ErrorResponse(500, "something went wrong while uploading");
         }
 
