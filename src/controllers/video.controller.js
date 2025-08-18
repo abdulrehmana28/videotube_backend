@@ -11,6 +11,8 @@ import {
 } from "../utils/cloudinary.js"
 import { deleteLocalFiles } from "../utils/deleteLocalFiles.js"
 
+// @desc    Get all videos with pagination and filtering
+// @route   GET /api/videos
 const getAllVideos = asyncHandler(async (req, res) => {
     const {
         page = 1,
@@ -83,6 +85,8 @@ const getAllVideos = asyncHandler(async (req, res) => {
         .json(new ApiResponse(200, videos, "Videos fetched successfully"));
 });
 
+// @desc    Upload and publish a new video
+// @route   POST /api/videos
 const publishAVideo = asyncHandler(async (req, res) => {
 
     const { title, description } = req.body;
@@ -166,6 +170,8 @@ const publishAVideo = asyncHandler(async (req, res) => {
 
 });
 
+// @desc    Get a single video by ID
+// @route   GET /api/videos/:videoId
 const getVideoById = asyncHandler(async (req, res) => {
     const { videoId } = req.params;
 
@@ -201,8 +207,9 @@ const getVideoById = asyncHandler(async (req, res) => {
 
 });
 
+// @desc    Update video details like title, description, thumbnail
+// @route   PATCH /api/videos/:videoId
 const updateVideo = asyncHandler(async (req, res) => {
-    // update video details like: title, description, thumbnail
 
     const { videoId } = req.params;
     const { title = '', description = '' } = req.body || {};
@@ -307,6 +314,8 @@ const updateVideo = asyncHandler(async (req, res) => {
     }
 });
 
+// @desc    Delete a video and its associated files
+// @route   DELETE /api/videos/:videoId
 const deleteVideo = asyncHandler(async (req, res) => {
     try {
         const { videoId } = req.params;
@@ -356,6 +365,8 @@ const deleteVideo = asyncHandler(async (req, res) => {
     }
 });
 
+// @desc    Toggle video publish status (published/unpublished)
+// @route   PATCH /api/videos/toggle/publish/:videoId
 const togglePublishStatus = asyncHandler(async (req, res) => {
     try {
         const { videoId } = req.params;
