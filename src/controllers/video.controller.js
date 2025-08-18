@@ -12,9 +12,76 @@ import {
 import { deleteLocalFiles } from "../utils/deleteLocalFiles.js"
 
 const getAllVideos = asyncHandler(async (req, res) => {
-    const { page = 1, limit = 10, query, sortBy, sortType, userId } = req.query
-    //TODO: get all videos based on query, sort, pagination
-})
+    const {
+        page = 1,
+        limit = 10,
+        query = "",
+        sortBy = "createdAt",
+        sortType = "desc",
+        userId } = req.query;
+
+    if (!userId?.trimEnd()) {
+        throw new ErrorResponse(403, "user id must be provided");
+    }
+
+    const videos = await Video.aggregate([
+        {
+            $match: {
+                ...(query ? { title: { $regex: query, $options: "i" } } : {}),
+                ...(userId ? { owner: new mongoose.Types.ObjectId(userId) } : {})
+            }
+        },
+        {
+            $lookup: {
+                from: "users",
+                localField: "owner",
+                foreignField: "_id",
+                as: "video_owner"
+            }
+        },
+        {
+            $addFields: {
+                owner_fullname: { $arrayElemAt: ["$video_owner.fullname", 0] },
+                owner_username: { $arrayElemAt: ["$video_owner.username", 0] },
+                owner_avatar: { $arrayElemAt: ["$video_owner.avatar", 0] },
+            },
+        },
+        {
+            $project: {
+                videoFile: 1,
+                thumbnail: 1,
+                title: 1,
+                description: 1,
+                duration: 1,
+                views: 1,
+                isPublished: 1,
+                createdAt: 1,
+                owner_fullname: 1,
+                owner_username: 1,
+                owner_avatar: 1,
+            }
+        },
+        {
+            $sort: {
+                [sortBy]: sortType === "desc" ? -1 : 1,
+            }
+        },
+        {
+            $skip: (page - 1) * parseInt(limit)
+        },
+        {
+            $limit: parseInt(limit)
+        }
+    ]);
+
+    if (!videos?.length) {
+        throw new ApiError(404, "Videos are not found");
+    }
+
+    return res
+        .status(200)
+        .json(new ApiResponse(200, videos, "Videos fetched successfully"));
+});
 
 const publishAVideo = asyncHandler(async (req, res) => {
 
@@ -290,8 +357,52 @@ const deleteVideo = asyncHandler(async (req, res) => {
 });
 
 const togglePublishStatus = asyncHandler(async (req, res) => {
-    const { videoId } = req.params
-})
+    try {
+        const { videoId } = req.params;
+
+        if (!videoId?.trim()) {
+            throw new ErrorResponse(400, "Video ID is missing");
+        }
+
+        const updatedVideo = await Video.findOneAndUpdate(
+            {
+                _id: videoId,
+                owner: req.user._id
+            },
+            [
+                {
+                    $set: {
+                        isPublished: { $not: "$isPublished" }
+                    }
+                }
+            ],
+            {
+                new: true
+            }
+        );
+
+        if (!updatedVideo) {
+            throw new ErrorResponse(404, "Video not found or you don't have permission to update it");
+        }
+
+        return res
+            .status(200)
+            .json(new ApiResponse(
+                200,
+                updatedVideo,
+                `Video ${updatedVideo.isPublished ? 'published' : 'unpublished'} successfully`
+            ));
+
+    } catch (error) {
+        console.error("Toggle Publish Status Error:", error);
+
+        if (error.name === 'CastError') {
+            throw new ErrorResponse(400, "Invalid video ID format");
+        }
+
+        throw new ErrorResponse(500, error.message || "Something went wrong while updating video status");
+    }
+});
 
 export {
     getAllVideos,
